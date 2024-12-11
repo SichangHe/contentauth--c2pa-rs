@@ -19,6 +19,7 @@ use std::{
 
 use asn1_rs::Oid;
 use c2pa_crypto::{base64, hash::sha256, openssl::OpenSslMutex};
+use log::trace;
 use openssl::x509::verify::X509VerifyFlags;
 
 use crate::{
@@ -244,7 +245,10 @@ pub(crate) fn verify_trust(
     // check the cert against the allowed list first
     let cert_sha256 = sha256(cert_der);
     let cert_hash_base64 = base64::encode(&cert_sha256);
-    if th.get_allowed_list().contains(&cert_hash_base64) {
+    let allowed_list = th.get_allowed_list();
+    trace!("verify_trust: allowed_list={allowed_list:?}");
+    if allowed_list.contains(&cert_hash_base64) {
+        trace!("verify_trust: allowed_list contains cert {cert_hash_base64}");
         return Ok(true);
     }
 
@@ -254,6 +258,7 @@ pub(crate) fn verify_trust(
     let mut store_ctx = openssl::x509::X509StoreContext::new().map_err(Error::OpenSslError)?;
 
     let chain = certs_der_to_x509(chain_der)?;
+    trace!("verify_trust: chain={chain:?}");
     for c in chain {
         cert_chain.push(c).map_err(Error::OpenSslError)?;
     }
@@ -276,6 +281,7 @@ pub(crate) fn verify_trust(
 
     // todo: figure out the passthrough case
     if th.get_anchors().is_empty() {
+        trace!("verify_trust: th.get_anchors is empty");
         return Ok(false);
     }
 

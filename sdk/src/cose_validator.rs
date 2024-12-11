@@ -31,6 +31,7 @@ use coset::{
     iana::{self, EnumI64},
     sig_structure_data, Label, TaggedCborSerializable,
 };
+use log::trace;
 use x509_parser::{
     der_parser::{ber::parse_ber_sequence, oid},
     num_bigint::BigUint,
@@ -376,6 +377,7 @@ pub(crate) fn check_cert(
         .map_err(|_| Error::CoseInvalidCert)?
     {
         Some(BasicExtension { value: eku, .. }) => {
+            trace!("check_cert: Extended key usage={eku:?}");
             if eku.any {
                 log_item!(
                     "Cose_Sign1",
@@ -422,7 +424,10 @@ pub(crate) fn check_cert(
 
             true
         }
-        None => tbscert.is_ca(), // if is not ca it must be present
+        None => {
+            trace!("check_cert: Checking if certificate is CA.");
+            tbscert.is_ca()
+        } // if is not ca it must be present
     };
 
     // populate needed extension info
@@ -833,10 +838,12 @@ fn check_trust(
     signing_time_epoc: Option<i64>,
     validation_log: &mut impl StatusTracker,
 ) -> Result<()> {
+    trace!("check_trust: signing_time_epoc={signing_time_epoc:?}");
     // just return is trust checks are disabled or misconfigured
     match get_settings_value::<bool>("verify.verify_trust") {
         Ok(verify_trust) => {
             if !verify_trust {
+                trace!("check_trust: trust checks disabled");
                 return Ok(());
             }
         }
@@ -1168,6 +1175,7 @@ pub(crate) fn verify_cose(
     validation_log: &mut impl StatusTracker,
 ) -> Result<ValidationInfo> {
     let sign1 = get_cose_sign1(cose_bytes, data, validation_log)?;
+    trace!("verify_cose: cert_check={cert_check}");
 
     let alg = match get_signing_alg(&sign1) {
         Ok(a) => a,
